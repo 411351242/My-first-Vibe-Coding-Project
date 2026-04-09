@@ -39,7 +39,11 @@
 *   **Node.js 18+**
 
 ### 2. 環境變數設定
-在專案根目錄建立 `.env` 檔案：
+在專案根目錄找到 `.env` 檔案
+
+**請先申請Google Gemini API與FRED API**
+
+若有需要可寄信至411351242@cloud.fju.edu.tw借用金鑰：
 ```env
 # 必要：Google Gemini API 金鑰
 GEMINI_API_KEY=your_key_here
@@ -54,6 +58,10 @@ FRED_API_KEY=your_key_here
 python start.py
 ```
 *此腳本會自動檢查環境、安裝缺失依賴、並同時啟動後端伺服器 (Port 8000) 與前端開發環境 (Port 3000)。*
+
+### 4.**於新分頁中開啟http://localhost:3000/即可使用**
+
+**剛開啟需等待時間抓取資料，請耐心等候**
 
 ---
 
