@@ -1,0 +1,52 @@
+:root {
+  --bg-color-primary: #0f172a;      /* 深藍灰色背景 (Tailwind slate-900) */
+  --bg-color-secondary: #1e293b;    /* 稍淺面板背景 (slate-800) */
+  --text-color-primary: #f8fafc;    /* 主文字顏色 (slate-50) */
+  --text-color-secondary: #94a3b8;  /* 次要文字顏色 (slate-400) */
+  
+  --brand-primary: #3b82f6;         /* 品牌主色 亮藍 (blue-500) */
+  --brand-primary-hover: #2563eb;   /* 品牌主色 Hover (blue-600) */
+  --brand-success: #10b981;         /* 成功/看多 (emerald-500) */
+  --brand-danger: #ef4444;          /* 失敗/看空 (red-500) */
+  --brand-warning: #f59e0b;         /* 警告/中立 (amber-500) */
+  
+  --border-color: #334155;          /* 邊框色 (slate-700) */
+  --glass-bg: rgba(30, 41, 59, 0.7);/* 玻璃透射背景 */
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+  background-color: var(--bg-color-primary);
+  color: var(--text-color-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-color-primary);
+}
+
+/* 滾動條美化 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-color-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-color-secondary);
+}

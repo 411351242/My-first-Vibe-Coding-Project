@@ -1,0 +1,18 @@
+# 後端開發與 API
+fastapi>=0.135.1
+uvicorn>=0.41.0
+pydantic>=2.12.5
+pydantic-settings>=2.13.1
+
+# 數據取得與處理
+yfinance>=1.2.0
+pandas>=2.3.3
+numpy>=2.4.3
+beautifulsoup4>=4.14.3
+requests>=2.32.5
+aiohttp>=3.13.3
+
+# AI 模型與 RAG 框架
+google-genai>=1.70.0
+tensorflow>=2.21.0
+scikit-learn>=1.8.0
