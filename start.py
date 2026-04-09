@@ -12,17 +12,30 @@ def run_command(command, cwd=None):
 
 def start_project():
     # Detect environment
-    if platform.system() == "Windows":
-        venv_python = os.path.join("venv", "Scripts", "python.exe")
-        venv_pip = os.path.join("venv", "Scripts", "pip.exe")
+    venv_dir = None
+    for d in [".venv", "venv"]:
+        if os.path.exists(d):
+            venv_dir = d
+            break
+            
+    if venv_dir:
+        if platform.system() == "Windows":
+            venv_python = os.path.join(venv_dir, "Scripts", "python.exe")
+            venv_pip = os.path.join(venv_dir, "Scripts", "pip.exe")
+        else:
+            venv_python = os.path.join(venv_dir, "bin", "python")
+            venv_pip = os.path.join(venv_dir, "bin", "pip")
     else:
-        venv_python = os.path.join("venv", "bin", "python")
-        venv_pip = os.path.join("venv", "bin", "pip")
-
-    # Ensure venv exists
-    if not os.path.exists("venv"):
-        print("Creating virtual environment...")
-        subprocess.run([sys.executable, "-m", "venv", "venv"], check=True)
+        # Default to .venv if none exist
+        print("No virtual environment found. Defaulting to creating .venv...")
+        venv_dir = ".venv"
+        subprocess.run([sys.executable, "-m", "venv", venv_dir], check=True)
+        if platform.system() == "Windows":
+            venv_python = os.path.join(venv_dir, "Scripts", "python.exe")
+            venv_pip = os.path.join(venv_dir, "Scripts", "pip.exe")
+        else:
+            venv_python = os.path.join(venv_dir, "bin", "python")
+            venv_pip = os.path.join(venv_dir, "bin", "pip")
         subprocess.run([venv_pip, "install", "-r", "requirements.txt"], check=True)
 
     # Ensure frontend dependencies
@@ -31,10 +44,10 @@ def start_project():
         subprocess.run(["npm", "install"], cwd="frontend", shell=(platform.system() == "Windows"), check=True)
 
     # Start services
-    print("Starting backend...")
-    backend = run_command([venv_python, "-m", "uvicorn", "backend.main:app", "--reload"])
+    print("Starting backend (127.0.0.1:8000)...")
+    backend = run_command([venv_python, "-m", "uvicorn", "backend.main:app", "--host", "127.0.0.1", "--port", "8000", "--reload"])
     
-    print("Starting frontend...")
+    print("Starting frontend (Vite)...")
     frontend = run_command(["npm", "run", "dev"], cwd="frontend")
 
     try:
@@ -44,6 +57,7 @@ def start_project():
         print("\nStopping services...")
         backend.terminate()
         frontend.terminate()
+
 
 if __name__ == "__main__":
     start_project()

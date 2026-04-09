@@ -19,12 +19,16 @@ class AnalysisRequest(BaseModel):
 @router.get("/status")
 def get_system_status():
     """檢查後端 AI 服務是否就緒，前端頁面載入時輪詢此端點"""
+    print("[Status] Checking AI engine readiness...")
     # 執行真正的穩定性握手 (Handshake)，確保 gRPC 已 warm-up
     ai_ready = ai_engine.check_ready()
+    msg = "AI 引擎就緒，可執行分析" if ai_ready else "AI 引擎暖機中或 API 金鑰失效..."
+    print(f"[Status] AI Ready: {ai_ready} | Message: {msg}")
     return {
         "ai_ready": ai_ready,
-        "message": "AI 引擎就緒，可執行分析" if ai_ready else "AI 引擎暖機中或 API 金鑰失效..."
+        "message": msg
     }
+
 
 @router.post("/analyze")
 def run_analysis(request: AnalysisRequest):

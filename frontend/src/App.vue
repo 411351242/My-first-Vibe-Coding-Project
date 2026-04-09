@@ -103,14 +103,11 @@ const analyzeStock = async () => {
           <span class="logo-main">AI <strong>QUANT</strong></span>
           <span class="logo-sub">INTELLIGENCE PLATFORM</span>
         </div>
-        <span class="beta-chip">BETA</span>
       </div>
 
       <div class="header-source-info">
         <span class="source-label">Data Sources: Yahoo Finance · FRED | Last Update: {{ lastUpdated }}</span>
       </div>
-
-      <div class="bar-spacer"></div>
 
       <div class="bar-status">
         <div class="live-pill">
@@ -120,6 +117,7 @@ const analyzeStock = async () => {
         <span v-if="reportData" class="ticker-readout font-mono">{{ reportData.stock_info?.symbol }}</span>
       </div>
     </header>
+
 
     <!-- ═══ MAIN ══════════════════════════════════════════════════ -->
     <div class="main-grid">
@@ -131,7 +129,7 @@ const analyzeStock = async () => {
           <span>Global Market Overview</span>
           <span class="section-badge">Auto-refresh 60s</span>
         </div>
-        <GlobalDashboard class="market-content" />
+        <GlobalDashboard class="market-content" :ready="aiReady" />
       </section>
 
       <!-- ── RIGHT: Analysis Zone (always visible, prominent CTA) -->
@@ -363,8 +361,9 @@ const analyzeStock = async () => {
   display: flex;
   align-items: center;
   gap: 9px;
-  flex-shrink: 0;
+  flex: 1;
 }
+
 
 .logo-icon {
   color: var(--accent-blue);
@@ -396,23 +395,19 @@ const analyzeStock = async () => {
   font-family: var(--font-mono);
 }
 
-.beta-chip {
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1px;
-  color: #0a0f1a;
-  background: var(--accent-amber);
-  border-radius: 3px;
-  padding: 2px 6px;
+.header-source-info {
+  flex: 2;
+  text-align: center;
 }
 
-.bar-spacer { flex: 1; }
+
 
 .bar-status {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  flex-shrink: 0;
+  flex: 1;
 }
 
 .live-pill {

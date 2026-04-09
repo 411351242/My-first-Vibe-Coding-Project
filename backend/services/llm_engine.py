@@ -22,12 +22,15 @@ class LLMInsightEngine:
     @property
     def client(self):
         """首次存取時才建立 Gemini client，避免冷啟動失效"""
-        if self._client is None and self.api_key and self.api_key != "your_gemini_api_key_here":
-            try:
-                self._client = genai.Client(api_key=self.api_key)
-                print("[LLM] Gemini client 物件建立成功 (待握手)")
-            except Exception as e:
-                print(f"[LLM] Gemini client 實例化失敗: {e}")
+        if self._client is None:
+            if self.api_key and self.api_key != "your_gemini_api_key_here":
+                try:
+                    self._client = genai.Client(api_key=self.api_key)
+                    print("[LLM] Gemini client 物件建立成功 (待握手)")
+                except Exception as e:
+                    print(f"[LLM] Gemini client 實例化失敗: {e}")
+            else:
+                print("[LLM] WARNING: GEMINI_API_KEY is missing or invalid. Client NOT initialized.")
         return self._client
 
     def check_ready(self) -> bool:
@@ -39,7 +42,6 @@ class LLMInsightEngine:
         if c:
             try:
                 # 執行最輕量的 metadata 讀取，驗證 API KEY 與網路連線池
-                # list_models 是分頁讀取，效能極高
                 models = c.models.list(config={'page_size': 1})
                 # 遍歷第一個元素以觸發真實連線
                 for _ in models: break
@@ -48,9 +50,10 @@ class LLMInsightEngine:
                 print("[LLM] Gemini Handshake 成功，連線池已熱機")
                 return True
             except Exception as e:
-                print(f"[LLM] Gemini Handshake 失敗 (這通常是 API Key 沒過或暖機中): {e}")
+                print(f"[LLM] Gemini Handshake 失敗 (請檢查網路或 API Key): {e}")
                 return False
         return False
+
 
     def extract_search_keywords(self, stock_info: dict, model_name: str) -> list[str]:
         """讓 LLM 根據公司名稱與產業決定 2 個最佳的搜尋關鍵字"""

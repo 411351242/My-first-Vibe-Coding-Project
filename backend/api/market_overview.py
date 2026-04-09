@@ -2,9 +2,12 @@
 市場總覽 API — 全球指數、大宗商品、外匯、宏觀關鍵指標
 使用 yfinance (已有依賴) + FRED API (已有 Key)
 """
-import os
 import time
 import requests
+import datetime
+import yfinance as yf
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from backend.core.config import settings
 from fastapi import APIRouter
 from typing import Optional
 
@@ -67,67 +70,111 @@ FRED_KEY_SERIES = [
 ]
 
 
-def _fetch_yf_quotes(symbols: list[str]) -> dict:
-    """批次用 yfinance 抓取即時報價"""
+def _fetch_single_yf_quote(sym: str) -> tuple[str, dict]:
+    """抓取單一 yfinance 報價的輔助函式"""
     try:
         import yfinance as yf
-        tickers = yf.Tickers(" ".join(symbols))
-        result = {}
-        for sym in symbols:
-            try:
-                info = tickers.tickers[sym].fast_info
-                price = getattr(info, "last_price", None)
-                prev = getattr(info, "previous_close", None)
-                change_pct = ((price - prev) / prev * 100) if price and prev else None
-                result[sym] = {
-                    "price": round(price, 4) if price else None,
-                    "change_pct": round(change_pct, 2) if change_pct is not None else None,
-                }
-            except Exception:
-                result[sym] = {"price": None, "change_pct": None}
-        return result
+        ticker = yf.Ticker(sym)
+        # 使用 fast_info 獲取即時價格與昨日收盤
+        fast = ticker.fast_info
+        
+        price = getattr(fast, "last_price", None)
+        prev = getattr(fast, "previous_close", None)
+        
+        if price and prev:
+            change = ((price - prev) / prev * 100)
+            return sym, {"price": round(price, 4), "change_pct": round(change, 2)}
+        elif price:
+            return sym, {"price": round(price, 4), "change_pct": 0.0}
     except Exception as e:
-        return {s: {"price": None, "change_pct": None} for s in symbols}
+        # 僅在 Debug 模式或嚴重錯誤時印出，避免日誌過多
+        pass
+    return sym, {"price": None, "change_pct": None}
+
+
+def _fetch_yf_quotes(symbols: list[str]) -> dict:
+    """並行抓取 yfinance 數據，大幅縮短載入時間"""
+    result = {s: {"price": None, "change_pct": None} for s in symbols}
+    print(f"[YF] Start parallel fetching for {len(symbols)} symbols...")
+    
+    # 預熱 yfinance 
+    try:
+        # 避免在並行中首次導入
+        _ = yf.Ticker("AAPL").fast_info
+    except:
+        pass
+    
+    # 使用 10 個 Worker 進行並列抓取
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_sym = {executor.submit(_fetch_single_yf_quote, sym): sym for sym in symbols}
+        
+        for future in as_completed(future_to_sym):
+            sym, quote = future.result()
+            result[sym] = quote
+            
+    print("[YF] Parallel fetching completed.")
+    return result
+
+
+
+from concurrent.futures import ThreadPoolExecutor
+
+def _fetch_single_fred(sid: str, api_key: str, one_yr_ago: str) -> tuple[str, dict]:
+    """抓取單一 FRED 指標的輔助函式"""
+    try:
+        url = (
+            f"https://api.stlouisfed.org/fred/series/observations"
+            f"?series_id={sid}&api_key={api_key}&file_type=json"
+            f"&sort_order=desc&observation_start={one_yr_ago}"
+        )
+        r = requests.get(url, timeout=5) # 縮短超時至 5 秒
+        resp_json = r.json()
+        
+        if "error_message" in resp_json:
+            print(f"[FRED] API Error for {sid}: {resp_json['error_message']}")
+            return sid, {"value": None, "change": None, "date": "", "history": []}
+
+        data = resp_json.get("observations", [])
+        if len(data) >= 1:
+            latest_val = data[0].get("value", ".")
+            prev_val = data[1].get("value", ".") if len(data) >= 2 else "."
+            val = float(latest_val) if latest_val != "." else None
+            prev = float(prev_val) if prev_val != "." else None
+            
+            history = []
+            for pt in reversed(data):
+                v = pt.get("value", ".")
+                if v != ".":
+                    history.append([pt.get("date"), float(v)])
+
+            return sid, {
+                "value": round(val, 3) if val is not None else None,
+                "change": round(val - prev, 3) if val is not None and prev is not None else None,
+                "date": data[0].get("date", ""),
+                "history": history
+            }
+    except Exception as e:
+        print(f"[FRED] Exception fetching {sid}: {e}")
+    return sid, {"value": None, "change": None, "date": "", "history": []}
 
 
 def _fetch_fred_latest(series_ids: list[str]) -> dict:
-    """從 FRED 取最新值與約一年歷史趨勢"""
-    import datetime
-    api_key = os.getenv("FRED_API_KEY", "")
+    """使用多執行緒並行抓取 FRED 指標"""
+    api_key = settings.FRED_API_KEY
     if not api_key:
+        print("[FRED] Warning: FRED_API_KEY is not set in environment.")
         return {}
-    results = {}
+        
     one_yr_ago = (datetime.datetime.now() - datetime.timedelta(days=365)).strftime("%Y-%m-%d")
+    results = {}
 
-    for sid in series_ids:
-        try:
-            url = (
-                f"https://api.stlouisfed.org/fred/series/observations"
-                f"?series_id={sid}&api_key={api_key}&file_type=json"
-                f"&sort_order=desc&observation_start={one_yr_ago}"
-            )
-            r = requests.get(url, timeout=8)
-            data = r.json().get("observations", [])
-            if len(data) >= 1:
-                latest_val = data[0].get("value", ".")
-                prev_val = data[1].get("value", ".") if len(data) >= 2 else "."
-                val = float(latest_val) if latest_val != "." else None
-                prev = float(prev_val) if prev_val != "." else None
-                
-                history = []
-                for pt in reversed(data):
-                    v = pt.get("value", ".")
-                    if v != ".":
-                        history.append([pt.get("date"), float(v)])
-
-                results[sid] = {
-                    "value": round(val, 3) if val is not None else None,
-                    "change": round(val - prev, 3) if val is not None and prev is not None else None,
-                    "date": data[0].get("date", ""),
-                    "history": history
-                }
-        except Exception:
-            results[sid] = {"value": None, "change": None, "date": "", "history": []}
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        # 並行執行所有請求
+        future_to_sid = {executor.submit(_fetch_single_fred, sid, api_key, one_yr_ago): sid for sid in series_ids}
+        for future in future_to_sid:
+            sid, data = future.result()
+            results[sid] = data
+            
     return results
 
 
@@ -138,73 +185,83 @@ def get_market_overview():
     """
     import time
     start = time.time()
+    
+    try:
+        # 一次抓取所有 yfinance symbols
+        all_yf_symbols = (
+            [idx["symbol"] for idx in INDICES]
+            + [c["symbol"] for c in COMMODITIES]
+            + [fx["symbol"] for fx in FX_PAIRS]
+        )
+        quotes = _fetch_yf_quotes(all_yf_symbols)
 
-    # 一次抓取所有 yfinance symbols
-    all_yf_symbols = (
-        [idx["symbol"] for idx in INDICES]
-        + [c["symbol"] for c in COMMODITIES]
-        + [fx["symbol"] for fx in FX_PAIRS]
-    )
-    quotes = _fetch_yf_quotes(all_yf_symbols)
+        # 整理指數
+        indices_data = []
+        for idx in INDICES:
+            q = quotes.get(idx["symbol"], {})
+            indices_data.append({
+                "symbol": idx["symbol"],
+                "name": idx["name"],
+                "region": idx["region"],
+                "price": q.get("price"),
+                "change_pct": q.get("change_pct"),
+            })
 
-    # 整理指數
-    indices_data = []
-    for idx in INDICES:
-        q = quotes.get(idx["symbol"], {})
-        indices_data.append({
-            "symbol": idx["symbol"],
-            "name": idx["name"],
-            "region": idx["region"],
-            "price": q.get("price"),
-            "change_pct": q.get("change_pct"),
-        })
+        # 整理大宗商品
+        commodities_data = []
+        for c in COMMODITIES:
+            q = quotes.get(c["symbol"], {})
+            commodities_data.append({
+                "symbol": c["symbol"],
+                "name": c["name"],
+                "unit": c["unit"],
+                "price": q.get("price"),
+                "change_pct": q.get("change_pct"),
+            })
 
-    # 整理大宗商品
-    commodities_data = []
-    for c in COMMODITIES:
-        q = quotes.get(c["symbol"], {})
-        commodities_data.append({
-            "symbol": c["symbol"],
-            "name": c["name"],
-            "unit": c["unit"],
-            "price": q.get("price"),
-            "change_pct": q.get("change_pct"),
-        })
+        # 整理外匯
+        fx_data = []
+        for fx in FX_PAIRS:
+            q = quotes.get(fx["symbol"], {})
+            fx_data.append({
+                "symbol": fx["symbol"],
+                "name": fx["name"],
+                "flag": fx["flag"],
+                "price": q.get("price"),
+                "change_pct": q.get("change_pct"),
+            })
 
-    # 整理外匯
-    fx_data = []
-    for fx in FX_PAIRS:
-        q = quotes.get(fx["symbol"], {})
-        fx_data.append({
-            "symbol": fx["symbol"],
-            "name": fx["name"],
-            "flag": fx["flag"],
-            "price": q.get("price"),
-            "change_pct": q.get("change_pct"),
-        })
+        # FRED 宏觀指標
+        fred_ids = [s["id"] for s in FRED_KEY_SERIES]
+        fred_raw = _fetch_fred_latest(fred_ids)
+        macro_data = []
+        for s in FRED_KEY_SERIES:
+            r = fred_raw.get(s["id"], {})
+            macro_data.append({
+                "id": s["id"],
+                "name": s["name"],
+                "unit": s["unit"],
+                "value": r.get("value"),
+                "change": r.get("change"),
+                "date": r.get("date", ""),
+                "history": r.get("history", []),
+            })
 
-    # FRED 宏觀指標
-    fred_ids = [s["id"] for s in FRED_KEY_SERIES]
-    fred_raw = _fetch_fred_latest(fred_ids)
-    macro_data = []
-    for s in FRED_KEY_SERIES:
-        r = fred_raw.get(s["id"], {})
-        macro_data.append({
-            "id": s["id"],
-            "name": s["name"],
-            "unit": s["unit"],
-            "value": r.get("value"),
-            "change": r.get("change"),
-            "date": r.get("date", ""),
-            "history": r.get("history", []),
-        })
-
-    return {
-        "data": {
-            "indices": indices_data,
-            "commodities": commodities_data,
-            "fx": fx_data,
-            "macro": macro_data,
-        },
-        "elapsed_ms": round((time.time() - start) * 1000),
-    }
+        return {
+            "status": "success",
+            "data": {
+                "indices": indices_data,
+                "commodities": commodities_data,
+                "fx": fx_data,
+                "macro": macro_data,
+            },
+            "elapsed_ms": round((time.time() - start) * 1000),
+        }
+    except Exception as e:
+        print(f"[API] Error in market-overview: {e}")
+        return {
+            "status": "error",
+            "message": str(e),
+            "data": {"indices": [], "commodities": [], "fx": [], "macro": []},
+            "elapsed_ms": round((time.time() - start) * 1000),
+        }

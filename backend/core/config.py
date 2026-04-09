@@ -37,10 +37,18 @@ class Settings(BaseSettings):
             )
 
 # 初始化設定實例
-settings = Settings()
-
-# 在模組載入時執行初步校驗
 try:
+    print(f"[Config] Looking for .env at: {os.path.join(BASE_DIR, '.env')}")
+    settings = Settings()
+    if settings.GEMINI_API_KEY:
+        masked_key = settings.GEMINI_API_KEY[:6] + "..." + settings.GEMINI_API_KEY[-4:] if len(settings.GEMINI_API_KEY) > 10 else "***"
+        print(f"[Config] GEMINI_API_KEY found: {masked_key}")
+    else:
+        print("[Config] WARNING: GEMINI_API_KEY is empty in .env")
+        
     settings.validate_keys()
 except ValueError as e:
-    print(e)
+    print(f"\n[!] Configuration Error: {e}")
+except Exception as e:
+    print(f"\n[!] Unexpected Error during config load: {e}")
+

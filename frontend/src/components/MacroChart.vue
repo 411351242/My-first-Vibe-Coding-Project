@@ -13,7 +13,7 @@ import {
 import VChart from 'vue-echarts';
 import { ref, onMounted, watch } from 'vue';
 
-// 註�? ECharts 必�??�件
+// 註冊 ECharts 必備組件
 use([
   CanvasRenderer,
   LineChart,
@@ -35,7 +35,7 @@ const props = defineProps({
   },
   title: {
     type: String,
-    default: '總�??��?'
+    default: '總經指標'
   }
 });
 
@@ -51,11 +51,12 @@ const loadRealData = async (id, forceRefresh = false) => {
     const response = await axios.get(url);
     const dataObj = response.data.data;
     
-    // 如�??�為沒填 Key ?�傳�?Mock 結�?，�??��??�實結�?，都?��? title/dates/values
+    // 如果因為沒填 Key 而傳回 Mock 結果，或抓取到實體結果，都具備 title/dates/values
     let xAxisData = dataObj.dates || [];
     let seriesData = dataObj.values || [];
     
-    // 依照使用?��?求�?保�?官方?��??�稱，�??��??�割?��??�中??    let name = dataObj.title || id;
+    // 依照使用者需求：保留官方原始名稱，或者在此切換成中文
+    let name = dataObj.title || id;
     if (name.length > 55) {
       name = name.substring(0, 55) + '...';
     }
@@ -71,7 +72,7 @@ const loadRealData = async (id, forceRefresh = false) => {
     chartOption.value = {
       title: {
         text: `${name}`,
-        subtext: `資�?來�?: FRED (${id}) ??`,
+        subtext: `資料來源: FRED (${id})`,
         link: sourceLink,
         sublink: sourceLink,
         target: 'blank',
@@ -105,7 +106,7 @@ const loadRealData = async (id, forceRefresh = false) => {
         type: 'value',
         axisLabel: { color: '#94a3b8' },
         splitLine: { lineStyle: { color: '#334155', type: 'dashed' } },
-        scale: true // �?y 軸�?要永?��? 0 ?��?
+        scale: true // 讓 y 軸不需要永遠從 0 開始
       },
       series: [
         {
@@ -138,7 +139,7 @@ watch(() => props.indicatorId, (newVal) => {
   if(newVal) loadRealData(newVal);
 }, { immediate: true });
 
-// 讓父�?(App.vue) ?�以?�叫此方法�?觸發帶快?��??��?強制?�整
+// 讓父組件 (App.vue) 可以叫用此方法，觸發帶快取清空的強制重整
 defineExpose({
   refresh: () => loadRealData(props.indicatorId, true)
 });

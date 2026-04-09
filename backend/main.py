@@ -29,5 +29,6 @@ app.include_router(market_router, prefix="/api")
 
 if __name__ == "__main__":
     import uvicorn
-    # 作為當地開發時的啟動入口
+    # 強制監聽 127.0.0.1 以確保與 Vite Proxy 一致，避免 Windows 上的連線問題
     uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+

@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { use } from 'echarts/core';
 import { CanvasRenderer } from 'echarts/renderers';
 import { LineChart, CandlestickChart } from 'echarts/charts';
@@ -330,7 +330,7 @@ onMounted(() => {
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.15), 0 0 10px rgba(59,130,246,0.3);
 }
 
-/* ?? Chart Area ??????????????????????????????????????????? */
+/* ─── 图表区域 ────────────────────────────────────────────────────────────────── */
 .chart-wrapper {
   position: relative;
   flex: 1;
